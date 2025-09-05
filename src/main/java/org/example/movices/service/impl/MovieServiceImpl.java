@@ -3,7 +3,9 @@ package org.example.movices.service.impl;
 import lombok.RequiredArgsConstructor;
 import org.example.movices.dto.request.MovieRequest;
 import org.example.movices.dto.response.MovieResponse;
+import org.example.movices.exception.DuplicateResourceException;
 import org.example.movices.exception.ResourceNotFoundException;
+import org.example.movices.exception.UnauthorizedException;
 import org.example.movices.model.entity.Movie;
 import org.example.movices.repository.MovieRepository;
 import org.example.movices.service.MovieService;
@@ -11,6 +13,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.net.MalformedURLException;
@@ -31,10 +34,15 @@ public class MovieServiceImpl implements MovieService {
 
     @Override
     public MovieResponse createMovie(MovieRequest movieRequest) {
-        Movie movie = modelMapper.map(movieRequest, Movie.class);
-        movie = movieRepository.save(movie);
-        return modelMapper.map(movie, MovieResponse.class);
+        try {
+            Movie movie = modelMapper.map(movieRequest, Movie.class);
+            movie = movieRepository.save(movie);
+            return modelMapper.map(movie, MovieResponse.class);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateResourceException("Movie with title '" + movieRequest.getTitle() + "' already exists!");
+        }
     }
+
 
     @Override
     public MovieResponse getMovieById(Long id) {

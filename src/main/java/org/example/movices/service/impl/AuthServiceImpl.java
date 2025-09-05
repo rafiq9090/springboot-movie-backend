@@ -17,7 +17,9 @@ import org.example.movices.config.JwtTokenProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,23 +42,37 @@ public class AuthServiceImpl implements AuthService {
             throw new UnauthorizedException("Email is already in use!");
         }
 
-        // Fetch default user role
-        Role userRole = roleRepository.findByName(RoleType.ROLE_USER)
-                .orElseThrow(() -> new ResourceNotFoundException("Default role ROLE_USER not configured"));
-
         // Create new user
         User user = new User();
-        user.setUsername(request.getUsername().toLowerCase()); // store in lowercase
+        user.setUsername(request.getUsername().toLowerCase());
         user.setEmail(request.getEmail().toLowerCase());
-        user.setPassword(passwordEncoder.encode(request.getPassword())); // encode password
-        user.getRoles().add(userRole);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
 
+        Set<Role> assignedRoles = new HashSet<>();
+
+        // If no roles specified, assign default ROLE_USER
+        if (request.getRole() != null && !request.getRole().isEmpty()) {
+            request.getRole().forEach(roleName -> {
+
+                Role role = roleRepository.findByName(RoleType.valueOf("ROLE_" + roleName.toUpperCase()))
+                        .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleName));
+                assignedRoles.add(role);
+            });
+        } else {
+            // default ROLE_USER
+            Role defaultRole = roleRepository.findByName(RoleType.ROLE_USER)
+                    .orElseThrow(() -> new ResourceNotFoundException("Default role ROLE_USER not configured"));
+            assignedRoles.add(defaultRole);
+        }
+
+
+        user.setRoles(assignedRoles);
         return userRepository.save(user);
     }
 
     @Override
     public JwtResponse signIn(LoginRequest request) {
-        // Find user by username (convert to lowercase to match storage)
+        // Find user by username
         User userEntity = userRepository.findByUsername(request.getUsername().toLowerCase())
                 .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
@@ -65,7 +81,7 @@ public class AuthServiceImpl implements AuthService {
             throw new UnauthorizedException("Invalid credentials");
         }
 
-        // Get roles
+        // Get role names
         List<String> roles = userEntity.getRoles()
                 .stream()
                 .map(role -> role.getName().name())
