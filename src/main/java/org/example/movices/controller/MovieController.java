@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -30,6 +31,14 @@ public class MovieController {
     public ResponseEntity<MovieResponse> createMovie(@RequestBody MovieRequest movieRequest) {
         MovieResponse createdMovie = movieService.createMovie(movieRequest);
         return new ResponseEntity<>(createdMovie, HttpStatus.CREATED);
+    }
+    @PostMapping(value = "upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<MovieResponse> uploadMovie(
+            @RequestPart("movie") MovieRequest movieRequest,
+            @RequestPart("file") MultipartFile file) {
+        MovieResponse movieResponse = movieService.createMovieWithFile(movieRequest, file);
+        return new ResponseEntity<>(movieResponse, HttpStatus.CREATED);
     }
 
     @GetMapping("/{id}")

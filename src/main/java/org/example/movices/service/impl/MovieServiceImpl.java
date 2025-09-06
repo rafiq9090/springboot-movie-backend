@@ -15,10 +15,14 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -40,6 +44,31 @@ public class MovieServiceImpl implements MovieService {
             return modelMapper.map(movie, MovieResponse.class);
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateResourceException("Movie with title '" + movieRequest.getTitle() + "' already exists!");
+        }
+    }
+
+    @Override
+    public MovieResponse createMovieWithFile(MovieRequest movieRequest, MultipartFile file) {
+        try {
+            // Ensure upload file exits
+            Path uploadDir = Paths.get("upload/movies/");
+            if (!Files.exists(uploadDir)) {
+                Files.createDirectories(uploadDir);
+            }
+            // Save the locally
+            String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+            Path filePath = uploadDir.resolve(fileName);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            // Map Request + Entity
+            Movie movie = modelMapper.map(movieRequest, Movie.class);
+            movie.setVideoUrl(filePath.toString()); // save file path DB
+
+            Movie saved = movieRepository.save(movie);
+            return modelMapper.map(saved, MovieResponse.class);
+
+        }catch (Exception ioException){
+            throw new RuntimeException("Movie upload failed",ioException);
         }
     }
 

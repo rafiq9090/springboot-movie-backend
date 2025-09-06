@@ -11,5 +11,4 @@ public class MovieRequest {
     private String rating;
     private String genre;
     private String thumbnailImage;
-    private String videoUrl;
 }
