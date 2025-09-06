@@ -32,14 +32,17 @@ public class MovieController {
         MovieResponse createdMovie = movieService.createMovie(movieRequest);
         return new ResponseEntity<>(createdMovie, HttpStatus.CREATED);
     }
-    @PostMapping(value = "upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MovieResponse> uploadMovie(
             @RequestPart("movie") MovieRequest movieRequest,
             @RequestPart("file") MultipartFile file) {
+
         MovieResponse movieResponse = movieService.createMovieWithFile(movieRequest, file);
         return new ResponseEntity<>(movieResponse, HttpStatus.CREATED);
     }
+
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
