@@ -4,6 +4,7 @@ package org.example.movices.controller;
 import lombok.RequiredArgsConstructor;
 import org.example.movices.dto.request.MovieRequest;
 import org.example.movices.dto.response.MovieResponse;
+import org.example.movices.exception.ResourceNotFoundException;
 import org.example.movices.service.MovieService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -25,24 +26,30 @@ import java.util.List;
 public class MovieController {
 
     private final MovieService movieService;
-
-    @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<MovieResponse> createMovie(@RequestBody MovieRequest movieRequest) {
-        MovieResponse createdMovie = movieService.createMovie(movieRequest);
-        return new ResponseEntity<>(createdMovie, HttpStatus.CREATED);
-    }
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<MovieResponse> createMovie(
+            @RequestParam("title") String title,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "director", required = false) String director,
+            @RequestParam(value = "releaseDate", required = false) String releaseDate,
+            @RequestParam(value = "rating", required = false) String rating,
+            @RequestParam(value = "genre", required = false) String genre,
+            @RequestParam("video") MultipartFile video,
+            @RequestParam(value = "photo", required = false) MultipartFile photo) {
 
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<MovieResponse> uploadMovie(
-            @RequestPart("movie") MovieRequest movieRequest,
-            @RequestPart("file") MultipartFile file) {
+        // Create MovieRequest manually
+        MovieRequest movieRequest = new MovieRequest();
+        movieRequest.setTitle(title);
+        movieRequest.setDescription(description);
+        movieRequest.setDirector(director);
+        movieRequest.setReleaseDate(releaseDate);
+        movieRequest.setRating(rating);
+        movieRequest.setGenre(genre);
 
-        MovieResponse movieResponse = movieService.createMovieWithFile(movieRequest, file);
+        MovieResponse movieResponse = movieService.createMovieWithFile(movieRequest, video, photo);
         return new ResponseEntity<>(movieResponse, HttpStatus.CREATED);
     }
-
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
@@ -80,8 +87,16 @@ public class MovieController {
         String contentType = "application/octet-stream";
         try {
             contentType = Files.probeContentType(Path.of(resource.getURI()));
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+
+            }
         } catch (IOException e) {
             // ignore
+        }
+        String fileName = resource.getFilename();
+        if (fileName == null) {
+            fileName = "Movie " + id;
         }
 
         return ResponseEntity.ok()

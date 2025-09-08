@@ -1,4 +1,3 @@
-
 package org.example.movices.config;
 
 import lombok.RequiredArgsConstructor;
@@ -26,14 +25,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/movies/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
+                        .requestMatchers("/api/movies/upload").hasRole("ADMIN") // Restrict upload to ADMIN
+                        .requestMatchers("/api/movies/**").permitAll() // Allow other movie endpoints
                         .anyRequest().authenticated()
                 )
-
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

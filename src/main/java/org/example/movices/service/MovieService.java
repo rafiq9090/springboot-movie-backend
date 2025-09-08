@@ -8,12 +8,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 public interface MovieService {
-    MovieResponse createMovie(MovieRequest movieRequest);
-    MovieResponse createMovieWithFile(MovieRequest movieRequest, MultipartFile file);
+    MovieResponse createMovieWithFile(MovieRequest movieRequest, MultipartFile video,MultipartFile photo);
     MovieResponse getMovieById(Long id);
     List<MovieResponse> getAllMovies();
     MovieResponse updateMovie(Long id, MovieRequest movieRequest);
     void deleteMovie(Long id);
     Resource downloadMovie(Long id);
 }
+
 

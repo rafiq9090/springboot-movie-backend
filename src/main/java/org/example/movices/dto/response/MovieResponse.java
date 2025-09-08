@@ -12,5 +12,5 @@ public class MovieResponse {
     private String rating;
     private String genre;
     private String thumbnailImage;
-    private String videoUrl;
+    private String video;
 }

@@ -21,9 +21,7 @@ public class Movie {
     private String rating;
     private String genre;
 
-    @Column(length = 500)
     private String thumbnailImage;
 
-    @Column(length = 1000)
-    private String videoUrl;
+    private String video;
 }
