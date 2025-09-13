@@ -65,12 +65,31 @@ public class MovieController {
         return ResponseEntity.ok(movies);
     }
 
-    @PatchMapping("/{id}")
+    @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<MovieResponse> updateMovie(@PathVariable Long id, @RequestBody MovieRequest movieRequest) {
-        MovieResponse updatedMovie = movieService.updateMovie(id, movieRequest);
-        return ResponseEntity.ok(updatedMovie);
-    }
+    public ResponseEntity<MovieResponse> updateMovie(
+            @PathVariable Long id,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "director", required = false) String director,
+            @RequestParam(value = "releaseDate", required = false) String releaseDate,
+            @RequestParam(value = "rating", required = false) String rating,
+            @RequestParam(value = "genre", required = false) String genre,
+            @RequestParam(value = "video", required = false) MultipartFile video,
+            @RequestParam(value = "thumbnail", required = false) MultipartFile thumbnail)
+
+     {
+        MovieRequest movieRequest = new MovieRequest();
+        movieRequest.setTitle(title);
+        movieRequest.setDescription(description);
+        movieRequest.setDirector(director);
+        movieRequest.setReleaseDate(releaseDate);
+        movieRequest.setRating(rating);
+        movieRequest.setGenre(genre);
+
+        MovieResponse movieResponse = movieService.updateMovie(id, movieRequest, video, thumbnail);
+        return new ResponseEntity<>(movieResponse, HttpStatus.OK);
+     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -103,5 +122,23 @@ public class MovieController {
                 .contentType(MediaType.parseMediaType(contentType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
                 .body(resource);
+    }
+
+    @GetMapping("/search")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    public ResponseEntity<List<MovieResponse>> searchMovie(
+            @RequestParam(value = "query") String query,
+            @RequestParam(value = "exact", defaultValue = "false") boolean exactMatch
+            ) {
+        List<MovieResponse> movies = movieService.searchMovie(query, exactMatch);
+        return ResponseEntity.ok(movies);
+    }
+
+    @GetMapping("/search/releven")
+    public ResponseEntity<List<MovieResponse>> searchRelevenMovie(
+            @RequestParam("q") String query
+    ){
+        List<MovieResponse> movies = movieService.searchMovie(query);
+        return ResponseEntity.ok(movies);
     }
 }

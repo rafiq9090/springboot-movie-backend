@@ -11,9 +11,11 @@ public interface MovieService {
     MovieResponse createMovieWithFile(MovieRequest movieRequest, MultipartFile video,MultipartFile photo);
     MovieResponse getMovieById(Long id);
     List<MovieResponse> getAllMovies();
-    MovieResponse updateMovie(Long id, MovieRequest movieRequest);
+    MovieResponse updateMovie(Long id, MovieRequest movieRequest, MultipartFile video, MultipartFile photo);
     void deleteMovie(Long id);
     Resource downloadMovie(Long id);
+    List<MovieResponse> searchMovie(String query);
+    List<MovieResponse> searchMovie(String query, boolean exactMatch);
 }
 
 

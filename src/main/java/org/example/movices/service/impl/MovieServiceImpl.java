@@ -1,13 +1,10 @@
 package org.example.movices.service.impl;
 
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.apache.tomcat.util.http.fileupload.InvalidFileNameException;
 import org.example.movices.dto.request.MovieRequest;
 import org.example.movices.dto.response.MovieResponse;
 import org.example.movices.exception.DuplicateResourceException;
 import org.example.movices.exception.ResourceNotFoundException;
-import org.example.movices.exception.UnauthorizedException;
 import org.example.movices.model.entity.Movie;
 import org.example.movices.repository.MovieRepository;
 import org.example.movices.service.MovieService;
@@ -22,9 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.*;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -110,15 +105,85 @@ public class MovieServiceImpl implements MovieService {
     }
 
     @Override
-    public MovieResponse updateMovie(Long id, MovieRequest movieRequest) {
-        Movie existingMovie = movieRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id: " + id));
+    public MovieResponse updateMovie(Long id, MovieRequest movieRequest, MultipartFile video, MultipartFile photo) {
+        try {
+            Movie existingMovie = movieRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id: " + id));
+            if (movieRequest.getTitle() != null &&
+                !movieRequest.getTitle().equals(existingMovie.getTitle()) &&
+                movieRepository.existsByTitle(movieRequest.getTitle())
+            ) {
+                throw new DuplicateResourceException("Movie with title '" + movieRequest.getTitle() + "' already exists");
+            }
 
-        modelMapper.map(movieRequest, existingMovie);
+            Path uploadPath = Paths.get(uploadDir);
+            if (!Files.exists(uploadPath)){
+                Files.createDirectories(uploadPath);
+            }
 
-        existingMovie = movieRepository.save(existingMovie);
-        return modelMapper.map(existingMovie, MovieResponse.class);
+            if (movieRequest.getTitle() != null ){
+                existingMovie.setTitle(movieRequest.getTitle());
+            }
+            if (movieRequest.getDescription() != null){
+                existingMovie.setDescription(movieRequest.getDescription());
+            }
+            if(movieRequest.getDirector() != null){
+                existingMovie.setDirector(movieRequest.getDirector());
+            }
+            if(movieRequest.getReleaseDate() != null){
+                existingMovie.setReleaseDate(movieRequest.getReleaseDate());
+            }
+            if (movieRequest.getGenre() != null){
+                existingMovie.setGenre(movieRequest.getGenre());
+            }
+            if (movieRequest.getRating() != null){
+                existingMovie.setRating(movieRequest.getRating());
+            }
+
+            if (photo != null && !photo.isEmpty()) {
+                validImageFile(photo);
+                if (existingMovie.getThumbnailImage() != null ){
+                    Path oldThumbnailPath = uploadPath.resolve(existingMovie.getThumbnailImage());
+                    Files.deleteIfExists(oldThumbnailPath);
+                }
+                String thumbnailFileName = generateFileName(photo.getOriginalFilename());
+                Path thumbnailPath = uploadPath.resolve(thumbnailFileName);
+                Files.copy(photo.getInputStream(), thumbnailPath);
+                existingMovie.setThumbnailImage(thumbnailFileName);
+            }
+
+            if (video != null && !video.isEmpty()) {
+                validVideoFile(video);
+                if (existingMovie.getVideo() != null){
+                    Path oldVideoPath = uploadPath.resolve(existingMovie.getVideo());
+                    Files.deleteIfExists(oldVideoPath);
+                }
+                String videoFileName = generateFileName(video.getOriginalFilename());
+                Path videoPath = uploadPath.resolve(videoFileName);
+                Files.copy(video.getInputStream(), videoPath);
+                existingMovie.setVideo(videoFileName);
+
+            }
+            Movie updateMovie = movieRepository.save(existingMovie);
+            return modelMapper.map(updateMovie, MovieResponse.class);
+
+        }catch (ResourceNotFoundException e) {
+            throw new ResourceNotFoundException("Movie not found with id: " + id);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
+//    @Override
+//    public MovieResponse updateMovie(Long id, MovieRequest movieRequest) {
+//        Movie existingMovie = movieRepository.findById(id)
+//                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id: " + id));
+//
+//        modelMapper.map(movieRequest, existingMovie);
+//
+//        existingMovie = movieRepository.save(existingMovie);
+//        return modelMapper.map(existingMovie, MovieResponse.class);
+//    }
 
     @Override
     public void deleteMovie(Long id) {
@@ -167,6 +232,63 @@ public class MovieServiceImpl implements MovieService {
         }
     }
 
+    @Override
+    public List<MovieResponse> searchMovie(String query) {
+        return searchMovie(query, false);
+    }
+
+    @Override
+    public List<MovieResponse> searchMovie(String query, boolean exactMatch) {
+        if (query == null || query.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        String searchQuery = query.trim();
+        List<Movie> movies;
+
+        try {
+            if (exactMatch) {
+                movies = findExactMatchMovies(query);
+            }else {
+                movies = findRelatedMovies(query);
+            }
+            return convertToResponse(movies);
+        }catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
+    public List<MovieResponse> searchReleven(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return getAllMovies();
+        }
+        String searchQuery = query.trim();
+        List<Movie> allMovies = movieRepository.searchMovie(searchQuery);
+
+        List<Movie> weightResult = new ArrayList<>();
+
+        List<Movie> exracTitleMatches = allMovies.stream()
+                .filter(movie -> movie.getTitle().equalsIgnoreCase(searchQuery))
+                .collect(Collectors.toList());
+        weightResult.addAll(exracTitleMatches);
+
+
+        List<Movie> titleContainMatch = allMovies.stream()
+                .filter(movie -> movie.getTitle().toLowerCase().contains(searchQuery.toLowerCase()))
+                .filter(movie -> !exracTitleMatches.contains(movie))
+                .collect(Collectors.toList());
+
+        weightResult.addAll(titleContainMatch);
+
+        List<Movie> otherMathc = allMovies.stream()
+                .filter(movie -> !weightResult.contains(movie))
+                .collect(Collectors.toList());
+        weightResult.addAll(otherMathc);
+
+        return weightResult.stream()
+                .map(movie -> modelMapper.map(movie,MovieResponse.class))
+                .collect(Collectors.toList());
+    }
+
     private void  validImageFile(MultipartFile file) {
         if (file.isEmpty()) {
             throw new ResourceNotFoundException("Empty image file");
@@ -209,4 +331,34 @@ public class MovieServiceImpl implements MovieService {
         }
         return uuid + extension;
    }
+
+   private List<Movie> findExactMatchMovies(String query) {
+        Optional<Movie> exactMovie = movieRepository.findByTitleIgnoreCase(query);
+
+        if (exactMovie.isPresent()) {
+            return List.of(exactMovie.get());
+        }else {
+            return movieRepository.findByTitleContainingIgnoreCase(query);
+        }
+   }
+
+   private List<Movie> findRelatedMovies(String query) {
+        List<Movie> movies = movieRepository.searchMovie(query);
+
+        if (movies == null || movies.isEmpty()) {
+            return movieRepository.findByTitleContainingIgnoreCase(query);
+        }
+        return movies;
+   }
+
+   private List<MovieResponse> convertToResponse(List<Movie> movies) {
+        if (movies == null || movies.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return movies.stream()
+                .map(movie -> modelMapper.map(movie,MovieResponse.class))
+                .collect(Collectors.toList());
+   }
 }
+
